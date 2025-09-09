@@ -131,10 +131,10 @@
         let players = [];
         let waitingQueue = [];
         const courts = [
-            { id: 1, status: 'available', players: [], gameType: null },
-            { id: 2, status: 'available', players: [], gameType: null },
-            { id: 3, status: 'available', players: [], gameType: null },
-            { id: 4, status: 'available', players: [], gameType: null },
+            { id: 1, status: 'available', players: [], gameType: null, startTime: null },
+            { id: 2, status: 'available', players: [], gameType: null, startTime: null },
+            { id: 3, status: 'available', players: [], gameType: null, startTime: null },
+            { id: 4, status: 'available', players: [], gameType: null, startTime: null },
         ];
 
         // 점수화 로직: 실력을 수치화하여 공정한 매칭을 돕습니다.
@@ -198,22 +198,30 @@
                 const isInGame = court.status === 'in-game';
                 courtDiv.className = `relative border-4 ${isInGame ? 'border-red-500' : 'border-green-500'} rounded-2xl shadow-lg overflow-hidden h-96 flex flex-col court-image ${isInGame ? 'in-game' : ''}`;
                 
+                const playerDisplay = (player) => `
+                    <div class="my-1">
+                        <p class="font-bold">${player.name}</p>
+                        <p class="text-xs font-normal text-gray-300">(${player.gender}, ${player.age}대, ${player.level}${player.detail})</p>
+                    </div>
+                `;
+
                 let contentHTML = '';
                 if (isInGame) {
                     const team1 = court.players.slice(0, 2);
                     const team2 = court.players.slice(2, 4);
                     contentHTML = `
                         <div class="court-overlay text-white">
-                            <div class="w-full text-center mb-4">
+                            <div class="w-full text-center mb-2">
                                 <h3 class="text-2xl font-bold">코트 ${court.id} - 경기중</h3>
                                 <p class="text-yellow-300 font-semibold">${court.gameType}</p>
+                                <p id="timer-${court.id}" class="text-xl font-mono mt-1 text-white">00:00</p>
                             </div>
-                            <div class="flex justify-around w-full text-center text-lg">
-                                <div><p class="font-bold">${team1[0].name}</p><p class="font-bold">${team1[1].name}</p></div>
-                                <div class="flex items-center text-2xl font-extrabold"><p>VS</p></div>
-                                <div><p class="font-bold">${team2[0].name}</p><p class="font-bold">${team2[1].name}</p></div>
+                            <div class="flex justify-around w-full text-center text-base">
+                                <div>${playerDisplay(team1[0])}${playerDisplay(team1[1])}</div>
+                                <div class="flex items-center text-xl font-extrabold"><p>VS</p></div>
+                                <div>${playerDisplay(team2[0])}${playerDisplay(team2[1])}</div>
                             </div>
-                            <button onclick="endGame(${court.id})" class="mt-8 bg-red-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">경기 종료</button>
+                            <button onclick="endGame(${court.id})" class="mt-4 bg-red-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">경기 종료</button>
                         </div>`;
                 } else if (court.status === 'assigning') {
                      const team1 = court.players.slice(0, 2);
@@ -224,12 +232,12 @@
                                 <h3 class="text-2xl font-bold">코트 ${court.id} - 배정 완료</h3>
                                  <p class="text-yellow-300 font-semibold">${court.gameType}</p>
                             </div>
-                           <div class="flex justify-around w-full text-center text-lg">
-                                <div><p class="font-bold">${team1[0].name}</p><p class="font-bold">${team1[1].name}</p></div>
-                                <div class="flex items-center text-2xl font-extrabold"><p>VS</p></div>
-                                <div><p class="font-bold">${team2[0].name}</p><p class="font-bold">${team2[1].name}</p></div>
+                           <div class="flex justify-around w-full text-center text-base">
+                                <div>${playerDisplay(team1[0])}${playerDisplay(team1[1])}</div>
+                                <div class="flex items-center text-xl font-extrabold"><p>VS</p></div>
+                                <div>${playerDisplay(team2[0])}${playerDisplay(team2[1])}</div>
                             </div>
-                            <button onclick="startGame(${court.id})" class="mt-8 bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors duration-300">경기 시작</button>
+                            <button onclick="startGame(${court.id})" class="mt-6 bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors duration-300">경기 시작</button>
                         </div>`;
                 }
                 else {
@@ -276,6 +284,7 @@
             const court = courts.find(c => c.id === courtId);
             if (court && court.status === 'assigning') {
                 court.status = 'in-game';
+                court.startTime = Date.now();
                 court.players.forEach(p => p.gamesPlayed++);
                 renderAll();
             }
@@ -288,6 +297,7 @@
                 court.status = 'available';
                 court.players = [];
                 court.gameType = null;
+                court.startTime = null;
                 renderAll();
                 setTimeout(findAndAssignMatch, 100);
             }
@@ -371,6 +381,21 @@
             reader.readAsArrayBuffer(file);
         });
 
+        function updateTimers() {
+            courts.forEach(court => {
+                if (court.status === 'in-game' && court.startTime) {
+                    const now = Date.now();
+                    const elapsed = Math.floor((now - court.startTime) / 1000);
+                    const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                    const seconds = String(elapsed % 60).padStart(2, '0');
+                    const timerElement = document.getElementById(`timer-${court.id}`);
+                    if (timerElement) {
+                        timerElement.textContent = `${minutes}:${seconds}`;
+                    }
+                }
+            });
+        }
+
         function renderAll() {
             renderWaitingList();
             renderCourts();
@@ -378,6 +403,7 @@
 
         // 초기 렌더링
         renderAll();
+        setInterval(updateTimers, 1000);
     </script>
 </body>
 </html>
