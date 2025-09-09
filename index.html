@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배드민턴 클럽 코트 배정 프로그램</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .court-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            transition: background-color 0.3s ease;
+        }
+        .court-image {
+            background-image: url('https://plus.unsplash.com/premium_photo-1661962386121-5503463a61f5?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .in-game .court-image {
+            filter: brightness(0.7);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-indigo-600">배드민턴 코트 배정 시스템</h1>
+            <p class="text-lg text-gray-600 mt-2">공정하고 즐거운 클럽 활동을 위해!</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Panel: Player Registration & Waiting List -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg">
+                <section id="player-registration">
+                    <h2 class="text-2xl font-semibold mb-4 border-b pb-2">참가자 등록</h2>
+                    <form id="add-player-form" class="space-y-4">
+                        <input type="text" id="name" placeholder="이름" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500" required>
+                        <div class="grid grid-cols-2 gap-4">
+                            <select id="gender" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <option value="남">남자</option>
+                                <option value="여">여자</option>
+                            </select>
+                            <select id="age" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <option value="10">10대</option>
+                                <option value="20">20대</option>
+                                <option value="30">30대</option>
+                                <option value="40">40대</option>
+                                <option value="45">45+</option>
+                                <option value="50">50대</option>
+                                <option value="60">60대</option>
+                                <option value="70">70대</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <select id="level" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <option value="A">A급</option>
+                                <option value="B">B급</option>
+                                <option value="C">C급</option>
+                                <option value="D">D급</option>
+                                <option value="E">E급</option>
+                            </select>
+                            <select id="detail" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <option value="상">상</option>
+                                <option value="중">중</option>
+                                <option value="하">하</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-300">대기 명단에 추가</button>
+                    </form>
+
+                    <div class="mt-6 pt-6 border-t">
+                        <h3 class="text-xl font-semibold mb-3">엑셀 일괄 등록</h3>
+                        <input type="file" id="excel-file-input" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".xlsx, .xls, .csv">
+                        <p class="text-xs text-gray-500 mt-2">
+                            * 파일 선택 시 자동으로 등록됩니다.<br>
+                            * 형식: A열부터 [이름, 성별, 나이, 급수, 세부실력] 순서로 작성해주세요. (첫 행은 헤더로 인식하고 건너뜁니다)
+                        </p>
+                    </div>
+                </section>
+
+                <section id="waiting-list" class="mt-8">
+                    <h2 class="text-2xl font-semibold mb-4 border-b pb-2">대기 명단</h2>
+                    <div id="waiting-players-container" class="space-y-2 h-96 overflow-y-auto bg-gray-50 p-3 rounded-lg">
+                        <p class="text-gray-500 text-center">대기중인 참가자가 없습니다.</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Panel: Courts -->
+            <div class="lg:col-span-2">
+                 <h2 class="text-2xl font-semibold mb-4 text-center lg:text-left">코트 현황</h2>
+                <div id="courts-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Court cards will be inserted here by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toast-message" class="fixed top-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transform translate-x-[150%] transition-transform duration-500 z-50">
+        <p id="toast-text"></p>
+    </div>
+
+    <script>
+        const addPlayerForm = document.getElementById('add-player-form');
+        const waitingPlayersContainer = document.getElementById('waiting-players-container');
+        const courtsContainer = document.getElementById('courts-container');
+        const excelFileInput = document.getElementById('excel-file-input');
+
+        let players = [];
+        let waitingQueue = [];
+        const courts = [
+            { id: 1, status: 'available', players: [], gameType: null },
+            { id: 2, status: 'available', players: [], gameType: null },
+            { id: 3, status: 'available', players: [], gameType: null },
+            { id: 4, status: 'available', players: [], gameType: null },
+        ];
+
+        // 점수화 로직: 실력을 수치화하여 공정한 매칭을 돕습니다.
+        const calculateScore = (player) => {
+            let score = 0;
+            const levelScores = { 'A': 50, 'B': 40, 'C': 30, 'D': 20, 'E': 10 };
+            const detailScores = { '상': 3, '중': 0, '하': -3 };
+            const ageModifiers = { '10': 0, '20': 0, '30': 0, '40': -1, '45': -2, '50': -3, '60': -4, '70': -5 };
+            
+            score += levelScores[player.level] || 0;
+            score += detailScores[player.detail] || 0;
+            score += ageModifiers[player.age] || 0;
+            return score;
+        };
+        
+        // 알림 메시지 함수
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast-message');
+            const toastText = document.getElementById('toast-text');
+            
+            toast.className = `fixed top-5 right-5 text-white py-3 px-6 rounded-lg shadow-lg transform transition-transform duration-500 z-50`; // Reset classes
+            if (isError) {
+                toast.classList.add('bg-red-500');
+            } else {
+                toast.classList.add('bg-green-500');
+            }
+
+            toastText.innerText = message;
+            toast.classList.remove('translate-x-[150%]');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-x-[150%]');
+            }, 3000);
+        }
+
+        // UI 렌더링 함수
+        const renderWaitingList = () => {
+            waitingPlayersContainer.innerHTML = '';
+            if (waitingQueue.length === 0) {
+                waitingPlayersContainer.innerHTML = '<p class="text-gray-500 text-center">대기중인 참가자가 없습니다.</p>';
+                return;
+            }
+            waitingQueue.forEach(player => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'p-3 bg-white rounded-lg shadow-sm flex justify-between items-center';
+                playerDiv.innerHTML = `
+                    <div>
+                        <span class="font-bold">${player.name}</span>
+                        <span class="text-sm text-gray-600">(${player.gender}, ${player.level}${player.detail}, ${player.gamesPlayed}회)</span>
+                    </div>
+                    <span class="font-semibold text-indigo-600">${player.score}점</span>
+                `;
+                waitingPlayersContainer.appendChild(playerDiv);
+            });
+        };
+
+        const renderCourts = () => {
+            courtsContainer.innerHTML = '';
+            courts.forEach(court => {
+                const courtDiv = document.createElement('div');
+                const isInGame = court.status === 'in-game';
+                courtDiv.className = `relative border-4 ${isInGame ? 'border-red-500' : 'border-green-500'} rounded-2xl shadow-lg overflow-hidden h-96 flex flex-col court-image ${isInGame ? 'in-game' : ''}`;
+                
+                let contentHTML = '';
+                if (isInGame) {
+                    const team1 = court.players.slice(0, 2);
+                    const team2 = court.players.slice(2, 4);
+                    contentHTML = `
+                        <div class="court-overlay text-white">
+                            <div class="w-full text-center mb-4">
+                                <h3 class="text-2xl font-bold">코트 ${court.id} - 경기중</h3>
+                                <p class="text-yellow-300 font-semibold">${court.gameType}</p>
+                            </div>
+                            <div class="flex justify-around w-full text-center text-lg">
+                                <div><p class="font-bold">${team1[0].name}</p><p class="font-bold">${team1[1].name}</p></div>
+                                <div class="flex items-center text-2xl font-extrabold"><p>VS</p></div>
+                                <div><p class="font-bold">${team2[0].name}</p><p class="font-bold">${team2[1].name}</p></div>
+                            </div>
+                            <button onclick="endGame(${court.id})" class="mt-8 bg-red-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">경기 종료</button>
+                        </div>`;
+                } else if (court.status === 'assigning') {
+                     const team1 = court.players.slice(0, 2);
+                    const team2 = court.players.slice(2, 4);
+                    contentHTML = `
+                        <div class="court-overlay text-white">
+                            <div class="w-full text-center mb-4">
+                                <h3 class="text-2xl font-bold">코트 ${court.id} - 배정 완료</h3>
+                                 <p class="text-yellow-300 font-semibold">${court.gameType}</p>
+                            </div>
+                           <div class="flex justify-around w-full text-center text-lg">
+                                <div><p class="font-bold">${team1[0].name}</p><p class="font-bold">${team1[1].name}</p></div>
+                                <div class="flex items-center text-2xl font-extrabold"><p>VS</p></div>
+                                <div><p class="font-bold">${team2[0].name}</p><p class="font-bold">${team2[1].name}</p></div>
+                            </div>
+                            <button onclick="startGame(${court.id})" class="mt-8 bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors duration-300">경기 시작</button>
+                        </div>`;
+                }
+                else {
+                    contentHTML = `
+                        <div class="court-overlay bg-green-900 bg-opacity-70 text-white">
+                            <h3 class="text-3xl font-bold">코트 ${court.id}</h3>
+                            <p class="text-2xl mt-4">대기중</p>
+                        </div>`;
+                }
+                courtDiv.innerHTML = contentHTML;
+                courtsContainer.appendChild(courtDiv);
+            });
+        };
+
+        // 핵심 로직: 경기 배정
+        const findAndAssignMatch = () => {
+            const availableCourt = courts.find(c => c.status === 'available');
+            if (!availableCourt || waitingQueue.length < 4) {
+                return;
+            }
+
+            waitingQueue.sort((a, b) => a.gamesPlayed - b.gamesPlayed || b.score - a.score);
+
+            const playersForGame = waitingQueue.slice(0, 4);
+            const team1 = [playersForGame[0], playersForGame[3]];
+            const team2 = [playersForGame[1], playersForGame[2]];
+
+            const menCount = playersForGame.filter(p => p.gender === '남').length;
+            let gameType = '';
+            if (menCount === 4) gameType = '남자 복식';
+            else if (menCount === 0) gameType = '여자 복식';
+            else if (menCount === 2) gameType = '혼합 복식';
+            else gameType = '연습 경기';
+
+            availableCourt.status = 'assigning';
+            availableCourt.players = [...team1, ...team2];
+            availableCourt.gameType = gameType;
+            waitingQueue.splice(0, 4);
+            renderAll();
+        };
+
+        // 이벤트 핸들러 및 전역 함수
+        window.startGame = (courtId) => {
+            const court = courts.find(c => c.id === courtId);
+            if (court && court.status === 'assigning') {
+                court.status = 'in-game';
+                court.players.forEach(p => p.gamesPlayed++);
+                renderAll();
+            }
+        };
+        
+        window.endGame = (courtId) => {
+            const court = courts.find(c => c.id === courtId);
+            if (court && court.status === 'in-game') {
+                waitingQueue.push(...court.players);
+                court.status = 'available';
+                court.players = [];
+                court.gameType = null;
+                renderAll();
+                setTimeout(findAndAssignMatch, 100);
+            }
+        };
+
+        addPlayerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            if (players.some(p => p.name === name)) {
+                showToast('이미 등록된 이름입니다.', true);
+                return;
+            }
+
+            const newPlayer = {
+                id: Date.now(),
+                name: name,
+                gender: document.getElementById('gender').value,
+                age: document.getElementById('age').value,
+                level: document.getElementById('level').value,
+                detail: document.getElementById('detail').value,
+                gamesPlayed: 0,
+            };
+            newPlayer.score = calculateScore(newPlayer);
+            
+            players.push(newPlayer);
+            waitingQueue.push(newPlayer);
+            
+            addPlayerForm.reset();
+            renderAll();
+            findAndAssignMatch();
+        });
+        
+        excelFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                let newPlayersCount = 0;
+                for (let i = 1; i < jsonData.length; i++) { // 첫 행(헤더) 건너뛰기
+                    const row = jsonData[i];
+                    if (!row || row.length < 5 || !row[0]) continue;
+
+                    const name = String(row[0]);
+                    if (players.some(p => p.name === name)) {
+                        console.warn(`Skipping duplicate player: ${name}`);
+                        continue;
+                    }
+
+                    const newPlayer = {
+                        id: Date.now() + i,
+                        name: name,
+                        gender: String(row[1]),
+                        age: String(row[2]),
+                        level: String(row[3]).toUpperCase(),
+                        detail: String(row[4]),
+                        gamesPlayed: 0,
+                    };
+                    newPlayer.score = calculateScore(newPlayer);
+                    
+                    players.push(newPlayer);
+                    waitingQueue.push(newPlayer);
+                    newPlayersCount++;
+                }
+                
+                if (newPlayersCount > 0) {
+                    showToast(`${newPlayersCount}명의 참가자가 성공적으로 등록되었습니다.`);
+                    renderAll();
+                    courts.forEach(court => { if (court.status === 'available') findAndAssignMatch(); });
+                } else {
+                    showToast('새롭게 등록된 참가자가 없습니다. (중복 이름 등 확인)', true);
+                }
+                excelFileInput.value = ''; // 같은 파일 다시 올릴 수 있도록 초기화
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function renderAll() {
+            renderWaitingList();
+            renderCourts();
+        }
+
+        // 초기 렌더링
+        renderAll();
+    </script>
+</body>
+</html>
+
